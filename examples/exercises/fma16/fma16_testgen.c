@@ -47,21 +47,32 @@ float convFloat(float16_t f16) {
 }
 
 void genCase(FILE *fptr, float16_t x, float16_t y, float16_t z, int mul, int add, int negp, int negz, int roundingMode, int zeroAllowed, int infAllowed, int nanAllowed) {
-    float16_t result;
+    float16_t result, tempY, tempZ;
     int op, flagVals;
-    char calc[80], flags[80];
+    char calc[100], flags[80];
     float32_t x32, y32, z32, r32;
     float xf, yf, zf, rf;
     float16_t smallest;
 
-    if (!mul) y.v = 0x3C00; // force y to 1 to avoid multiply
-    if (!add) z.v = 0x0000; // force z to 0 to avoid add
+    if (!mul) {
+        tempY.v = y.v;
+        y.v = 0x3C00; // force y to 1 to avoid multiply
+    }
+    if (!add) {
+        tempZ.v = z.v;
+        z.v = 0x0000; // force z to 0 to avoid add
+    }
     if (negp) x.v ^= 0x8000; // flip sign of x to negate p
     if (negz) z.v ^= 0x8000; // flip sign of z to negate z
     op = roundingMode << 4 | mul<<3 | add<<2 | negp<<1 | negz;
 //    printf("op = %02x rm %d mul %d add %d negp %d negz %d\n", op, roundingMode, mul, add, negp, negz);
     softfloat_exceptionFlags = 0; // clear exceptions
     result = f16_mulAdd(x, y, z); // call SoftFloat to compute expected result
+    
+    if (!mul) y.v = tempY.v;
+    if (!add) z.v = tempZ.v; 
+    if (negp) x.v ^= 0x8000; // flip sign of x
+    if (negz) z.v ^= 0x8000; // flip sign of z
 
     // Extract expected flags from SoftFloat
     sprintf(flags, "NV: %d OF: %d UF: %d NX: %d", 
@@ -77,16 +88,18 @@ void genCase(FILE *fptr, float16_t x, float16_t y, float16_t z, int mul, int add
     yf = convFloat(y);
     zf = convFloat(z);
     rf = convFloat(result);
-    if (mul)
-        if (add) sprintf(calc, "%f * %f + %f = %f", xf, yf, zf, rf);
-        else     sprintf(calc, "%f * %f = %f", xf, yf, rf);
-    else         sprintf(calc, "%f + %f = %f", xf, zf, rf);
+    sprintf(calc, "(-1)^%d * %f * (mul * %f + !mul) + ((-1)^%d * add * %f) = %f, add = %d, mul = %d", negp, xf, yf, negz, zf, rf, add, mul);
+    // if (mul)
+    //     if (add) sprintf(calc, "%f * %f + %f = %f", xf, yf, zf, rf);
+    //     else     sprintf(calc, "%f * %f + (add * %f) = %f, add = 0", xf, yf, zf, rf);
+    // else         sprintf(calc, "%f * (mul * %f + mul) + %f = %f", xf, zf, rf);
 
     // omit denorms, which aren't required for this project
     smallest.v = 0x0400;
     float16_t resultmag = result;
     resultmag.v &= 0x7FFF; // take absolute value
-    if (f16_lt(resultmag, smallest) && (resultmag.v != 0x0000)) fprintf (fptr, "// skip denorm: ");
+    if (f16_lt(resultmag, smallest) && ((resultmag.v & 0x7FFF) != 0x0000)) fprintf (fptr, "// skip denorm output: ");
+    if ((f16_lt(x, smallest) && ((x.v & 0x7FFF) != 0x0000)) | (f16_lt(y, smallest) && ((y.v & 0x7FFF) != 0x0000)) | (f16_lt(z, smallest) && ((z.v & 0x7FFF) != 0x0000))) fprintf (fptr, "// skip denorm input: ");
     if ((softfloat_exceptionFlags >> 1) % 2) fprintf(fptr, "// skip underflow: ");
 
     // skip special cases if requested
@@ -155,7 +168,8 @@ void genAddTests(uint16_t *e, uint16_t *f, int sgn, char *testName, char *desc, 
         exit(1);
     }
     prepTests(e, f, testName, desc, cases, fptr, &numCases);
-    z.v = 0x0000;
+
+    y.v = 0x3C00;
     for (i=0; i < numCases; i++) { 
         x.v = cases[i].v;
         for (j=0; j<numCases; j++) {
