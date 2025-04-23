@@ -67,6 +67,17 @@ void genCase(FILE *fptr, float16_t x, float16_t y, float16_t z, int mul, int add
     op = roundingMode << 4 | mul<<3 | add<<2 | negp<<1 | negz;
 //    printf("op = %02x rm %d mul %d add %d negp %d negz %d\n", op, roundingMode, mul, add, negp, negz);
     softfloat_exceptionFlags = 0; // clear exceptions
+    // set rounding mode
+    switch(roundingMode) {
+
+        case 3: softfloat_roundingMode = softfloat_round_max; break;
+
+        case 2: softfloat_roundingMode = softfloat_round_min; break;
+
+        case 1: softfloat_roundingMode = softfloat_round_near_even; break;
+         
+        case 0: softfloat_roundingMode = softfloat_round_minMag; break;
+    }
     result = f16_mulAdd(x, y, z); // call SoftFloat to compute expected result
     
     if (!mul) y.v = tempY.v;
@@ -239,34 +250,43 @@ int main()
     softfloatInit(); // configure softfloat modes
  
     // Test cases: multiplication
-    genMulTests(easyExponents, easyFracts, 0, "fmul_0", "// Multiply with exponent of 0, significand of 1.0 and 1.1, RZ", 0, 0, 0, 0);
+    // genMulTests(easyExponents, easyFracts, 0, "fmul_0", "// Multiply with exponent of 0, significand of 1.0 and 1.1, RZ", 0, 0, 0, 0);
 
 /*  // example of how to generate tests with a different rounding mode
     softfloat_roundingMode = softfloat_round_near_even; 
     genMulTests(easyExponents, easyFracts, 0, "fmul_0_rne", "// Multiply with exponent of 0, significand of 1.0 and 1.1, RNE", 1, 0, 0, 0); */
 
     // Add your cases here
-    genMulTests(medMulExponents, medMulFracts, 0, "fmul_1", "// Multiply positive normalized numbers, RZ", 0, 0, 0, 0);
-    genMulTests(medMulExponents, medMulFracts, 1, "fmul_2", "// Multiply signed normalized numbers, RZ", 0, 0, 0, 0);
-    genAddTests(easyExponents, easyFracts, 0, "fadd_0", "// Add with exponent of 0, RZ", 0, 0, 0, 0);
-    genAddTests(medAddExponents, medAddFracts, 0, "fadd_1", "// Add with positive normalized numbers, RZ", 0, 0, 0, 0);
-    genAddTests(medAddExponents, medAddFracts, 1, "fadd_2", "// Add with signed normalized numbers, RZ", 0, 0, 0, 0);
-    genFmaTests(easyExponents, easyFracts, 0, "fma_0", "// FMA with exponent of 0, RZ", 0, 0, 0, 0);
-    genFmaTests(medFmaExponents, medFmaFracts, 0, "fma_1", "// FMA with positive normalized numbers, RZ", 0, 0, 0, 0);
-    genFmaTests(medFmaExponents, medFmaFracts, 1, "fma_2", "// FMA with signed normalized inputs, RZ", 0, 0, 0, 0);
-    genFmaTests(specialExponents, specialFracts, 1, "fma_special_rz", "// FMA on special inputs/outputs, RZ", 0, 1, 1, 1);
-    genFmaTests(specialExponents, specialFracts, 1, "fma_special_rne", "// FMA on special inputs/outputs, RNE", 1, 1, 1, 1);
-    genFmaTests(specialExponents, specialFracts, 1, "fma_special_rp", "// FMA on special inputs/outputs, RP", 2, 1, 1, 1);
-    genFmaTests(specialExponents, specialFracts, 1, "fma_special_rn", "// FMA on special inputs/outputs, RN", 3, 1, 1, 1);
+    // genMulTests(medMulExponents, medMulFracts, 0, "fmul_1", "// Multiply positive normalized numbers, RZ", 0, 0, 0, 0);
+    // genMulTests(medMulExponents, medMulFracts, 1, "fmul_2", "// Multiply signed normalized numbers, RZ", 0, 0, 0, 0);
+    // genAddTests(easyExponents, easyFracts, 0, "fadd_0", "// Add with exponent of 0, RZ", 0, 0, 0, 0);
+    // genAddTests(medAddExponents, medAddFracts, 0, "fadd_1", "// Add with positive normalized numbers, RZ", 0, 0, 0, 0);
+    // genAddTests(medAddExponents, medAddFracts, 1, "fadd_2", "// Add with signed normalized numbers, RZ", 0, 0, 0, 0);
+    // genFmaTests(easyExponents, easyFracts, 0, "fma_0", "// FMA with exponent of 0, RZ", 0, 0, 0, 0);
+    // genFmaTests(medFmaExponents, medFmaFracts, 0, "fma_1", "// FMA with positive normalized numbers, RZ", 0, 0, 0, 0);
+    // genFmaTests(medFmaExponents, medFmaFracts, 1, "fma_2", "// FMA with signed normalized inputs, RZ", 0, 0, 0, 0);
+    // genFmaTests(specialExponents, specialFracts, 1, "fma_special_rz", "// FMA on special inputs/outputs, RZ", 0, 1, 1, 1);
+    // genFmaTests(specialExponents, specialFracts, 1, "fma_special_rne", "// FMA on special inputs/outputs, RNE", 1, 1, 1, 1);
+    // genFmaTests(specialExponents, specialFracts, 1, "fma_special_rp", "// FMA on special inputs/outputs, RP", 3, 1, 1, 1);
+    // genFmaTests(specialExponents, specialFracts, 1, "fma_special_rn", "// FMA on special inputs/outputs, RN", 2, 1, 1, 1);
 
     //generate random values
     srand(time(NULL));
-    uint16_t randExponents[] = {(uint16_t)(rand() % 32), (uint16_t)(rand() % 32), (uint16_t)(rand() % 32), 0x8000};
-    uint16_t randFracts[] = {(uint16_t)(rand() % 1024), (uint16_t)(rand() % 1024), (uint16_t)(rand() % 1024), 0x8000};
-    genFmaTests(randExponents, randFracts, 1, "fma_rand_rz", "// FMA on random inputs, RZ", 0, 1, 1, 1);
-    genFmaTests(randExponents, randFracts, 1, "fma_rand_rne", "// FMA on random inputs, RNE", 1, 1, 1, 1);
-    genFmaTests(randExponents, randFracts, 1, "fma_rand_rp", "// FMA on random inputs, RP", 2, 1, 1, 1);
-    genFmaTests(randExponents, randFracts, 1, "fma_rand_rn", "// FMA on random inputs, RN", 3, 1, 1, 1);
+    for(int i = 0; i < 50; i++) {
+        uint16_t randExponents[] = {(uint16_t)(rand() % 32), (uint16_t)(rand() % 32), (uint16_t)(rand() % 32), (uint16_t)(rand() % 32), (uint16_t)(rand() % 32), 0x8000};
+        uint16_t randFracts[] = {(uint16_t)(rand() % 1024), (uint16_t)(rand() % 1024), (uint16_t)(rand() % 1024), (uint16_t)(rand() % 1024), (uint16_t)(rand() % 1024), 0x8000};
+        genFmaTests(randExponents, randFracts, 1, "fma_rand_all", "// FMA on random inputs, RZ", 0, 1, 1, 1);
+        genFmaTests(randExponents, randFracts, 1, "fma_rand_all", "// FMA on random inputs, RNE", 1, 1, 1, 1);
+        genFmaTests(randExponents, randFracts, 1, "fma_rand_all", "// FMA on random inputs, RP", 3, 1, 1, 1);
+        genFmaTests(randExponents, randFracts, 1, "fma_rand_all", "// FMA on random inputs, RN", 2, 1, 1, 1);
+
+    }
+    // uint16_t randExponents[] = {(uint16_t)(rand() % 32), (uint16_t)(rand() % 32), (uint16_t)(rand() % 32), 0x8000};
+    // uint16_t randFracts[] = {(uint16_t)(rand() % 1024), (uint16_t)(rand() % 1024), (uint16_t)(rand() % 1024), 0x8000};
+    // genFmaTests(randExponents, randFracts, 1, "fma_rand_rz", "// FMA on random inputs, RZ", 0, 1, 1, 1);
+    // genFmaTests(randExponents, randFracts, 1, "fma_rand_rne", "// FMA on random inputs, RNE", 1, 1, 1, 1);
+    // genFmaTests(randExponents, randFracts, 1, "fma_rand_rp", "// FMA on random inputs, RP", 3, 1, 1, 1);
+    // genFmaTests(randExponents, randFracts, 1, "fma_rand_rn", "// FMA on random inputs, RN", 2, 1, 1, 1);
 
     return 0;
 }

@@ -1,14 +1,12 @@
 /* verilator lint_off STMTDLY */
 module testbench_fma16;
-  logic        clk, reset, on1;
+  logic        clk, reset;
   logic [15:0] x, y, z, rexpected, result;
   logic [7:0]  ctrl;
   logic        mul, add, negp, negz;
   logic [1:0]  roundmode;
   logic [31:0] vectornum, errors;
-  logic [63:0] totalTests;
-  logic [75:0] testvectors1[30000:0];
-  logic [75:0] testvectors2[300000:0];
+  logic [75:0] testvectors[1000000:0];
   logic [3:0]  flags, flagsexpected; // Invalid, Overflow, Underflow, Inexact
 
   // instantiate device under test
@@ -23,81 +21,50 @@ module testbench_fma16;
   // at start of test, load vectors and pulse reset
   initial
     begin
-      $readmemh("work/fma_2.tv", testvectors1);
-      $readmemh("work/fma_special_rz.tv", testvectors2);
+      // $readmemh("tests2/baby_torture.tv", testvectors);
+      $readmemh("tests2/fma_1.tv", testvectors);
+      // $readmemh("tests/fma_mega.tv", testvectors);
+      // $readmemh("work/fma_rand_all.tv", testvectors);
       vectornum = 0; errors = 0;
-      reset = 1; #22; reset = 0;
-      on1 = 1;
+      reset = 1; #22; reset = 0; 
     end
 
   // apply test vectors on rising edge of clk
   always @(posedge clk)
     begin
-      if (on1) begin
-        #1; {x, y, z, ctrl, rexpected, flagsexpected} = testvectors1[vectornum];
-        {roundmode, mul, add, negp, negz} = ctrl[5:0];
-        // if (testvectors1[vectornum] === 'x) begin
-        //   on1 = 0;
-        //   totalTests = vectornum;
-        //   vectornum = 0;
-        //   reset = 1; #22; reset = 0;
-        // end else begin
-        //   on1 = 1;
-        //   totalTests = totalTests;
-        //   vectornum = vectornum;
-        //   reset = 0;
-        // end
-      end else begin
-        #1; {x, y, z, ctrl, rexpected, flagsexpected} = testvectors2[vectornum];
-        {roundmode, mul, add, negp, negz} = ctrl[5:0];
-        // on1 = 0;
-        // totalTests = totalTests;
-        // vectornum = vectornum;
-        // reset = 0;
-      end
+      #1; {x, y, z, ctrl, rexpected, flagsexpected} = testvectors[vectornum];
+      {roundmode, mul, add, negp, negz} = ctrl[5:0];
     end
 
   // check results on falling edge of clk
   always @(negedge clk)
     if (~reset) begin // skip during reset
-      if (result !== rexpected /* | flags !== flagsexpected */) begin  // check result
-        $display("Error: inputs %h * %h + %h control: ", x, y, z, ctrl);
+      if (result !== rexpected | flags !== flagsexpected) begin  // check result
+        $display("Error: inputs %h * %h + %h  control: %h", x, y, z, ctrl);
         $display("  result = %h (%h expected) flags = %b (%b expected)", 
           result, rexpected, flags, flagsexpected);
-        $display("negp negz: %h %h", dut.negp, dut.negz);
-        $display("x: %h", dut.correctedX);
-        $display("y: %h", dut.correctedY);
-        $display("z: %h", dut.correctedZ);
-        $display("normals: %h %h %h", dut.xNormal, dut.yNormal, dut.zNormal);
-        $display("sum: %h", dut.addUnit.sum);
-        $display("mof: %h", dut.mulOverflow);
-        $display("aof: %h", dut.addOverflow);
-        $display("muf: %h", dut.mulUnderflow);
-        $display("ex: %h", dut.mulEx);
-        $display("offset: %h", dut.addUnit.offset);
-        $display("exI: %h", dut.addUnit.exponentIntermed);
-        $display("alignedP: %h", dut.expandedProduct);
-        $display("alignedZ: %h", dut.alignedZ);
-        $display("tempfrac: %h", dut.tempFrac);
-        $display("nx: %h", {{1{1'b1}}, dut.correctedX[9:0]});
-        $display("ny: %h", {{1{1'b1}}, dut.correctedY[9:0]});
-        $display("ssum: %h", dut.addUnit.sumShifted);
-        $display("alc: %h", dut.addSetup.alignCount);
-        $display("tempex: %h", dut.mulUnit.tempEx);
-        $display("fmaex: %h", dut.fmaEx);
-        $display("znex: %h", dut.xNonInf);
         errors = errors + 1;
+        $display("m a np nz: %h %h %h %h", dut.mul, dut.add, dut.negp, dut.negz);
+        $display("rm: %b", dut.roundmode);
+        $display("x, y, z: %h %h %h", dut.correctedX, dut.correctedY, dut.correctedZ);
+        $display("norm, nan: %h %h", dut.allNormal, dut.noNans);
+        $display("xyzni: %h %h %h", dut.xNonInf, dut.yNonInf, dut.zNonInf);
+        $display("xyznz: %h %h %h", dut.xNonZero, dut.yNonZero, dut.zNonZero);
+        $display("prod: %h", {dut.mulSign, dut.roundedMulEx, dut.mulFrac});
+        $display("tf: %h", dut.fullMulFrac);
+        $display("moui: %h %h %h", dut.mulOverflow, dut.mulUnderflow, dut.mulInexact);
+        $display("p: %h", dut.expandedProduct);
+        $display("z: %h", dut.alignedZ);
+        $display("aligc: %h", dut.addSetup.alignCount);
+        $display("sum: %h", dut.addUnit.sum);
+        $display("sz: %h", dut.sumZero);
+        $display("of: %h", dut.resultSelect.overflow);
+        $display("exi: %h", dut.addUnit.exponentIntermed);
       end
       vectornum = vectornum + 1;
-      if ((on1) & (testvectors1[vectornum] === 'x)) begin
-        on1 = 0;
-        totalTests = vectornum;
-        vectornum = 0;
-        reset = 1; #22; reset = 0;
-      end
-      if ((!on1) & (testvectors2[vectornum] === 'x)) begin 
+      if (testvectors[vectornum] === 'x) begin 
         $display("%d tests completed with %d errors", 
-	           totalTests + vectornum - 2, errors);
+	           vectornum, errors);
         $stop;
       end
     end

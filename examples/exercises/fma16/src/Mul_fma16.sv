@@ -1,37 +1,96 @@
-// Luke Summers
-// fma16 multiplication unit
-// ful product in tempFrac, 10 bit frac in frac
+// Luke Summers lsummers@g.hmc.edu 23 April 2025
 
+// fma16 multiplication unit
+// inputs:  xNonZero, yNonZero - 0 if input 0, 1 otherwise
+//          xNonInf, yNonInf - 0 if input inf, 1 otherwise
+//          add, roundmode - fma control signals
+//          x, y - fma inputs {sign[15], ex[14:10], frac[9:0]}
+// outputs: sign - product sign
+//          roundedEx, unroundedEx - rounded and unrounded product exponent
+//          frac - 10 bit product fraction
+//          fullFrac - full 22 bit product, 2.22
+//          underflow - 1 if underflow occurred, 0 otherwise
+//          overflow - 1 if overflow occurred, 0 otherwise
+//          inexact - 1 if inexact result, 0 otherwise
 module Mul_fma16(
-    input  logic xNonZero, yNonZero,
+    input  logic xNonZero, yNonZero, xNonInf, yNonInf, add,
+    input  logic [1:0] roundmode,
     input  logic [15:0] x, y,
     output logic sign,
-    output logic [4:0] ex,
+    output logic [4:0] roundedEx, unroundedEx,
     output logic [9:0] frac,
-    output logic [21:0] tempFrac,
-    output logic underflow, overflow
+    output logic [21:0] fullFrac,
+    output logic underflow, overflow , inexact
 );
     // exponent logic intermed
     logic [5:0] tempEx;
+    //rounding bits
+    logic r, g, t;
+    // pre rounding frac
+    logic [9:0] unroundedFrac;
 
-    assign sign = x[15] ^ y[15];
+    Round_fma16 mulRounder(
+        .roundmode(roundmode),
+        .sign(sign), .g(g), .r(r), .t(t),
+        .fracIn(unroundedFrac), .exIn(unroundedEx),
+        .fracOut(frac), .exOut(roundedEx)
+    );
 
-    assign tempFrac = {xNonZero, x[9:0]} * {yNonZero, y[9:0]};
+    always_comb begin
+        // sign bit
+        sign = x[15] ^ y[15];
+        // product, Q2.22 number
+        fullFrac = {xNonZero, x[9:0]} * {yNonZero, y[9:0]};
+        // product exponent, adjust for bias and if multiplication caused increase
+        tempEx = {{1{1'b0}}, x[14:10]} + {{1{1'b0}}, y[14:10]} + {{5{1'b0}}, fullFrac[21]} - 15;
 
-    // tempFrac is 2.22, so frac depends on where first 1 in tempFrac is
-    assign frac = tempFrac[21]? tempFrac[20:11] : tempFrac[19:10];
+        if (tempEx[5] | (tempEx == 6'b011111)) begin
+            // overflow and underflow
+            if ((tempEx[4:0] < x[14:10]) | (tempEx == 6'b011111)) begin 
+                // overflow
+                underflow = 1'b0;
+                overflow = 1'b1;
+                // set tempEx so ex will be the number mul overflowed by
+                tempEx = tempEx + 1;
 
-    // bias is 15, need to adjust if tempFrac[21] is 1 as that means tempFrac was not naturalized
-    assign tempEx = x[14:10] + y[14:10] - 15 + {{4{1'b0}}, tempFrac[21]};
+            end else begin
+                // underflow
+                underflow = 1'b1;
+                overflow = 1'b0;
+                // set tempEx so ex will be the number mul underflowed by
+                tempEx = ~tempEx + 1;
 
-    // if tempEx[5] is set, it went negative so ex got too small
-    assign underflow = tempEx[5];
+            end
 
-    // if tempEx[5] is set and ex < x[14:10], bit got set from adding the exponents together
-    // not from becoming negative
-    // also if ex is 31, result is inf whic is overflow
-    assign overflow = (tempEx[5] & (ex < x[14:10])) | (ex == {5{1'b1}});
+        end else begin 
+            // no underflow or overflow
+            underflow = 1'b0;
+            overflow = 1'b0;
 
-    assign ex = tempEx[4:0];
+        end
+        // setting product exponent
+        unroundedEx = tempEx[4:0];
+
+        if (fullFrac[21]) begin
+            // bit 21 set, so prod frac starts at bit 20
+            unroundedFrac = fullFrac[20:11];
+            // rounding bits
+            g = fullFrac[10];
+            r = fullFrac[9];
+            t = |fullFrac[8:0];
+
+        end else begin
+            // bit 21 not set, so prod frac starts at bit 19
+            unroundedFrac = fullFrac[19:10];
+            // rounding bits
+            g = fullFrac[9];
+            r = fullFrac[8];
+            t = |fullFrac[7:0];
+
+        end
+        // inexact flag for mul
+        inexact = r | g | t | overflow ;
+        
+    end
 
 endmodule
