@@ -207,7 +207,8 @@ module spi_controller (
   // Aligned EXACTLY ON THE MIDDLE of the leading and trailing edges.
   // Sweeeeeeeeeet...
   assign InvertClock = ^SckMode;
-  always_ff @(posedge ~PCLK) begin
+  assign InvertPCLK = ~PCLK;
+  always_ff @(posedge InvertPCLK) begin
     if (~PRESETn | TransmitStart) begin
       ShiftEdge <= 0;
       SampleEdge <= 0;

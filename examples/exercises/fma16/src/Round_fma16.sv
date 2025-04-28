@@ -1,6 +1,13 @@
-// Luke Summers
-// rounding unit for fma16 module
+// Luke Summers lsummers@g.hmc.edu 23 Apr 2025
 
+// rounding unit for fma16 module
+// inputs:  roundmode - fma control signal
+//          sign - sign of result that is being rounded
+//          g, r, t - gaurd, round, and sticky bits for result being rounded
+//          fracIn - frac for result being rounded
+//          exIn - exponent for result being rounded
+// outputs: fracOut - rounded frac for result
+//          exOut - rounded exponent for result
 module Round_fma16(
     input  logic [1:0] roundmode,
     input  logic sign, g, r, t,
@@ -14,15 +21,13 @@ module Round_fma16(
         case(roundmode)
             // RP
             2'b11: begin
-                    // round up if positive
+                    // round up if positive and any round bits set
                     exOut = exIn + (((g | r | t) & (!sign)) & (&fracIn));
-
                     fracOut = fracIn + ((g | r | t) & (!sign));
-
             end
             // RN
             2'b10: begin
-                    // round down if neg
+                    // round down if neg and any round bits set
                     exOut = exIn + (((g | r | t) & sign) & (&fracIn));
 
                     fracOut = fracIn + ((g | r | t) & sign);

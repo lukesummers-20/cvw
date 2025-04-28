@@ -1,13 +1,30 @@
-// Luke Summers
+// Luke Summers lsummers@g.hmc.edu 23 April 2025
+
 // fma16 module for selecting what the result is
 // selection based on if inputs special cases, or overflow/underflow
-
+// inputs:  xNonZero, yNonZero, zNonZero - 0 if input 1, 1 otherwise
+//          xNonInf, yNonInf, zNonInf - 0 if input inf, 1 otherwise
+//          noNans - 0 if any input is nan, 1 otherwise
+//          signaling - 1 if any input is signaling nan, 0 otherwise
+//          allNormal - 1 if all inputs normal, 0 otherwise
+//          mulOverflow, addOverflow - 1 if op overflowed, 0 otherwise
+//          mulInexact, addInexact - 1 if op result inexact, 0 otherwise
+//          mulUnderflow - 1 if mul underflowed, 0 otherwise
+//          sumZero - 1 if sum was 0, 0 otherwise
+//          sumSubnorm - 1 if sum was subnorm, 0 otherwise
+//          mul, add - fma control signals
+//          prodSign - sign of product
+//          roundmode - fma control signal
+//          x, z - fma inputs {sign[15], ex[14:10], frac[9:0]}
+//          sum - addition result {sign[15], ex[14:10], frac[9:0]}
+//outputs:  result - fma result {sign[15], ex[14:10], frac[9:0]}
+//          flags - flags for result {invalid, overflow, underflow, inexact}
 module ResultSelector_fma16(
     input  logic xNonZero, yNonZero, zNonZero,
     input  logic xNonInf, yNonInf, zNonInf,
     input  logic noNans, signaling,
     input  logic allNormal,
-    input  logic mulOverflow, addOverflow, mulInexact, addInexact, mulUnderflow, sumZero,
+    input  logic mulOverflow, addOverflow, mulInexact, addInexact, mulUnderflow, sumZero, sumSubnorm,
     input  logic mul, add, prodSign,
     input  logic [1:0] roundmode,
     input  logic [15:0] x, z, sum,
@@ -59,7 +76,45 @@ module ResultSelector_fma16(
                 end 
                 // no flags
                 flags = 4'b0000;
-                
+            end else if (sumSubnorm) begin
+
+                if (roundmode == 2'b11) begin
+                    // RP s0 min num if +, 0 if -
+                    if (sum[15]) begin
+                        // - 0
+                        result = 16'b1000000000000000;
+                    
+                    end else begin
+                        // + min num
+                        result = 16'b0000010000000000;
+
+                    end
+
+                end else if (roundmode == 2'b10) begin
+                    // RN so 0 if +, min num if -
+                    if (sum[15]) begin
+                        // - min num
+                        result = 16'b1000010000000000;
+
+                    end else begin
+                        // + 0
+                        result = {16{1'b0}};
+
+                    end
+
+                end else if (roundmode == 2'b01) begin
+                    // RNE so minnum
+                    result = {sum[15], 15'b000010000000000};
+
+
+                end else begin
+                    // RN so trunc
+                    result = {sum[15], {15{1'b0}}};
+
+                end
+
+                flags = 4'b0001;
+
             end else if (overflow) begin
 
                 case(roundmode)

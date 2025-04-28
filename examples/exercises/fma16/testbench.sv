@@ -21,8 +21,11 @@ module testbench_fma16;
   // at start of test, load vectors and pulse reset
   initial
     begin
+      // $readmemh("tests2/fmul_0.tv", testvectors);
+      // $readmemh("tests2/fadd_0.tv", testvectors);
+      // $readmemh("tests2/fma_0.tv", testvectors);
+      $readmemh("tests2/fma_special_rne.tv", testvectors);
       // $readmemh("tests2/baby_torture.tv", testvectors);
-      $readmemh("tests2/fma_1.tv", testvectors);
       // $readmemh("tests/fma_mega.tv", testvectors);
       // $readmemh("work/fma_rand_all.tv", testvectors);
       vectornum = 0; errors = 0;
@@ -39,6 +42,7 @@ module testbench_fma16;
   // check results on falling edge of clk
   always @(negedge clk)
     if (~reset) begin // skip during reset
+      // if (result !== rexpected /*| flags !== flagsexpected*/) begin  // check result
       if (result !== rexpected | flags !== flagsexpected) begin  // check result
         $display("Error: inputs %h * %h + %h  control: %h", x, y, z, ctrl);
         $display("  result = %h (%h expected) flags = %b (%b expected)", 
@@ -60,6 +64,10 @@ module testbench_fma16;
         $display("sz: %h", dut.sumZero);
         $display("of: %h", dut.resultSelect.overflow);
         $display("exi: %h", dut.addUnit.exponentIntermed);
+        $display("a grt: %h", dut.addUnit.addRounder.g, dut.addUnit.addRounder.r, dut.addUnit.addRounder.t);
+        $display("ssub: %h", dut.addUnit.subnorm);
+        $display("aex: %h", dut.addUnit.ex);
+        $display("afrac: %h", dut.addUnit.frac);
       end
       vectornum = vectornum + 1;
       if (testvectors[vectornum] === 'x) begin 

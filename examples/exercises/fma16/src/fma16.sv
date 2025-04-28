@@ -1,6 +1,15 @@
-//Luke Summers lsummers@g.hmc.edu
-//module for half precision float multiply
+//Luke Summers lsummers@g.hmc.edu 23 Apr 2025
 
+// module for half precision float multiply
+// inputs:  x, y, z - values for x * y + z, in half precision float {sign[15], ex[14:10], frac[9:0]}
+//          mul - control signal to enable mul operation, if 0 y forced to 1
+//          add - control signal to enable add operation, if 0 z forced to 0
+//          negp - control signal to negate sign of product, if 1 product's sign flipped
+//          negz - control signal to negate sign of z, if 1 z's sign flipped
+//          roundmode - control signal for adhering to different rounding modes
+//                      {RZ : 00, RNE : 01, RM(Round Negative):10, RP: 11}
+// outputs: result - value of x * y + z in half precision float {sign[15], ex[14:10], frac[9:0]}
+//          flags - fma operation output flags{invalid, overflow, underflow, inexact}
 module fma16(
     input logic [15:0] x, y, z,
     input logic mul, add, negp, negz,
@@ -8,13 +17,13 @@ module fma16(
     output logic [15:0] result,
     output logic [3:0] flags
 );
-    logic mulSign, fmaSign, mulOverflow, addOverflow, mulUnderflow, mulInexact, addInexact, sumZero;
+    logic mulSign, fmaSign, mulOverflow, addOverflow, mulUnderflow, mulInexact, addInexact, sumZero, sumSubnorm;
     logic xNonZero, yNonZero, zNonZero, xNonInf, yNonInf, zNonInf, noNans, signaling, allNormal;
     logic [4:0] roundedMulEx, unroundedMulEx, fmaEx;
     logic [9:0] mulFrac, fmaFrac;
     logic [15:0] correctedX, correctedY, correctedZ;
     logic[21:0] fullMulFrac;
-    logic [68:0] alignedZ, expandedProduct;
+    logic [70:0] alignedZ, expandedProduct;
 
     // get correct input signals for x, y, and z based on the control signals
     // negp : negates x * y
@@ -65,7 +74,7 @@ module fma16(
                     .p(expandedProduct), .z(alignedZ),
                     .roundmode(roundmode),
                     .sign(fmaSign), .ex(fmaEx), .frac(fmaFrac), .overflow(addOverflow), .inexact(addInexact),
-                    .zero(sumZero)
+                    .zero(sumZero), .subnorm(sumSubnorm)
                     );
 
     // selects correct fma result and puts it in result signal
@@ -77,7 +86,7 @@ module fma16(
                                     .allNormal(allNormal),
                                     .mulOverflow(mulOverflow), .addOverflow(addOverflow),
                                     .mulInexact(mulInexact), .addInexact(addInexact),
-                                    .mulUnderflow(mulUnderflow), .sumZero(sumZero),
+                                    .mulUnderflow(mulUnderflow), .sumZero(sumZero), .sumSubnorm(sumSubnorm),
                                     .mul(mul), .add(add), .prodSign(mulSign), .roundmode(roundmode),
                                     .x(correctedX), .z(correctedZ),
                                     .sum({fmaSign, fmaEx, fmaFrac}),

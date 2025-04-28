@@ -14,15 +14,16 @@
 //          ex - result exponent
 //          frac - result fraction
 //          zero - 1 if result 0, 0 otherwise
+//          subnorm - 1 if result subnorm, 0 otherwise
 module Add_fma16(
     input  logic pSign, zSign, add, mulUnderflow, mulOverflow,
     input  logic [4:0] pEx, zEx,
-    input  logic [68:0] p, z,
+    input  logic [70:0] p, z,
     input  logic [1:0] roundmode,
     output logic sign, overflow, inexact,
     output logic [4:0] ex,
     output logic [9:0] frac,
-    output logic zero
+    output logic zero, subnorm
 );
     // command for lint to ignore warning
     /* verilator lint_off UNOPTFLAT */
@@ -32,7 +33,7 @@ module Add_fma16(
     /* verilator lint_on UNOPTFLAT */
 
     // signals for sum and the shifted sum
-    logic [68:0] sum, sumShifted, gMask, rMask, tMask;
+    logic [70:0] sum, sumShifted, gMask, rMask, tMask;
     // rounding signals
     logic g, r, t;
     // pre round frac
@@ -41,7 +42,7 @@ module Add_fma16(
     logic[4:0] unroundedEx;
 
     // priority decoder, puts the number of the most significant bit with a 1 of sum into offset
-    binencoder #(.N(69)) priorityDecoder (.A(sum), .Y(offset));
+    binencoder #(.N(71)) priorityDecoder (.A(sum), .Y(offset));
 
     // rounding handler
     Round_fma16 addRounder(
@@ -84,16 +85,16 @@ module Add_fma16(
         // offset is most significant 1 bit of sum
         // 39 is what offset would be if sum is aligned with the product
         if (mulUnderflow) begin
-            // addends start aligned to bit 67 with z's ex
-            exponentIntermed = offset - 66 + {{2{1'b0}}, zEx};
+            // addends start aligned to bit 69 with z's ex
+            exponentIntermed = offset - 68 + {{2{1'b0}}, zEx};
 
         end else if (mulOverflow) begin
             // addends start aligned to bit 40 with ex of 30
-            exponentIntermed = offset - 9;
+            exponentIntermed = offset - 10;
 
         end else begin
             // addends start aligned to bit 40 with ex of prod
-            exponentIntermed = offset - 39 + {{2{1'b0}}, pEx};
+            exponentIntermed = offset - 40 + {{2{1'b0}}, pEx};
 
         end
         // setting sum ex
@@ -109,27 +110,27 @@ module Add_fma16(
         // setting rounding bit masks
         if (offset > 12) begin 
             // sum large enough for all bits
-            gMask = {{68{1'b0}}, {1{1'b1}}} << (offset - 11);
-            rMask = {{68{1'b0}}, {1{1'b1}}} << (offset - 12);
-            tMask = {69{1'b1}} >>> (81 - offset);
+            gMask = {{70{1'b0}}, {1{1'b1}}} << (offset - 11);
+            rMask = {{70{1'b0}}, {1{1'b1}}} << (offset - 12);
+            tMask = {71{1'b1}} >>> (83 - offset);
 
         end else if (offset == 12) begin 
             // sum large enough for g and r
-            gMask = {{68{1'b0}}, {1{1'b1}}} << (offset - 11);
-            rMask = {{68{1'b0}}, {1{1'b1}}} << (offset - 12);
-            tMask = {69{1'b0}};
+            gMask = {{70{1'b0}}, {1{1'b1}}} << (offset - 11);
+            rMask = {{70{1'b0}}, {1{1'b1}}} << (offset - 12);
+            tMask = {71{1'b0}};
 
         end else if (offset == 11) begin 
             // sum large enough for g 
-            gMask = {{68{1'b0}}, {1{1'b1}}} << (offset - 11);
-            rMask = {69{1'b0}};
-            tMask = {69{1'b0}};
+            gMask = {{70{1'b0}}, {1{1'b1}}} << (offset - 11);
+            rMask = {71{1'b0}};
+            tMask = {71{1'b0}};
 
         end else begin 
             // no rounding bits
-            gMask = {69{1'b0}};
-            rMask = {69{1'b0}};
-            tMask = {69{1'b0}};
+            gMask = {71{1'b0}};
+            rMask = {71{1'b0}};
+            tMask = {71{1'b0}};
 
         end
         // setting rounding bits
@@ -142,8 +143,12 @@ module Add_fma16(
         // setting the sumZero signal
         // 1 if sum is 0, 0 otherwise
         zero = !(|sum);
+        // setting sumSubnorm signal
+        // 1 if sum is subnormal, 0 otherwise
+        subnorm = ((exponentIntermed == 7'b0000000) & (ex == 5'b00000) & (!zero));
         // setting inexact signal
         inexact = g | r | t | overflow;
+        
 
     end
 
