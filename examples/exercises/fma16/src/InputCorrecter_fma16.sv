@@ -1,5 +1,4 @@
 // Luke Summers lsummers@g.hmc.edu 23 April 2025
-
 // fma16 module to correct inputs for mul, add, negp, negz
 // inputs:  mul - fma mul control signal
 //          add - fma add control signal
@@ -19,5 +18,4 @@ module InputCorrecter_fma16 (
     // if add is 1, cZ is z if not cZ is 0
     // if negz is 1, negate the sign of z
     assign cZ = add ? z ^ {negz, 15'b000000000000000} : {16{1'b0}};
-
 endmodule

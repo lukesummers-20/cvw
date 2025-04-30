@@ -1,5 +1,4 @@
 // Luke Summers lsummers@g.hmc.edu 23 Apr 2025
-
 // rounding unit for fma16 module
 // inputs:  roundmode - fma control signal
 //          sign - sign of result that is being rounded
@@ -17,30 +16,24 @@ module Round_fma16(
     output logic [4:0] exOut
 );
     always_comb begin
-
         case(roundmode)
             // RP
             2'b11: begin
                     // round up if positive and any round bits set
-                    exOut = exIn + (((g | r | t) & (!sign)) & (&fracIn));
-                    fracOut = fracIn + ((g | r | t) & (!sign));
+                    exOut = exIn + {{4{1'b0}}, (((g | r | t) & (!sign)) & (&fracIn))};
+                    fracOut = fracIn + {{9{1'b0}}, ((g | r | t) & (!sign))};
             end
             // RN
             2'b10: begin
                     // round down if neg and any round bits set
-                    exOut = exIn + (((g | r | t) & sign) & (&fracIn));
-
-                    fracOut = fracIn + ((g | r | t) & sign);
-                    
-
+                    exOut = exIn + {{4{1'b0}}, (((g | r | t) & sign) & (&fracIn))};
+                    fracOut = fracIn + {{9{1'b0}}, ((g | r | t) & sign)};
             end
             // RNE
             2'b01: begin
                     // round if it is to nearest ties even
-                    exOut = exIn + (((r | t | fracIn[0]) & g) & (&fracIn));
-
-                    fracOut = fracIn + ((r | t | fracIn[0]) & g);
-                    
+                    exOut = exIn + {{4{1'b0}}, (((r | t | fracIn[0]) & g) & (&fracIn))};
+                    fracOut = fracIn + {{9{1'b0}}, ((r | t | fracIn[0]) & g)};
             end
             // RZ
             2'b00: begin
@@ -48,9 +41,6 @@ module Round_fma16(
                     exOut = exIn;
                     fracOut = fracIn;
             end
-
         endcase
-
     end
-
 endmodule
